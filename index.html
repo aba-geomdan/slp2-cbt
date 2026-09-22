@@ -278,8 +278,9 @@ let run=null, timerH=null, fs=LS.get(K_FS,1);
 /* ================= 홈 ================= */
 function renderHome(){
   show("home");
+  if(BOOK&&BOOK.id==="_past") return renderPastHome();
   if(!DATA){
-    $("#home").innerHTML=`<h1>2급 언어재활사 CBT 연습</h1><div class="userbar"><span>${BOOKS.length>1?`<label>문제집 <select id="bookSel">${BOOKS.map(b=>`<option value="${esc(b.id)}" ${b.id===BOOK.id?"selected":""}>${esc(b.title)}</option>`).join("")}</select></label>`:""}</span>
+    $("#home").innerHTML=`<h1>2급 언어재활사 CBT 연습</h1><div class="userbar"><span>${bookSelHtml()}</span>
       <span>${esc(USER.email)} · ${ROLE==="admin"?`<button class="btn" id="adminBtn" style="padding:4px 10px">이용자 관리</button> `:""}<button class="btn" id="logout" style="padding:4px 10px">로그아웃</button></span></div>
       <div class="sheet"><h2>${esc(BOOK.title)}</h2><p class="note" style="padding-top:12px">이 문제집은 아직 문제가 올라오지 않았어요.</p></div>`;
     $("#logout").onclick=async()=>{await flushSync();await sb.auth.signOut();location.reload()};
@@ -294,7 +295,7 @@ function renderHome(){
   const saved=LS.get(K_RUN,null);
   let h=`<h1>2급 언어재활사 CBT 연습</h1>
   <p class="lead">실제 시험과 같은 교시 구성과 시간으로 풀어요.</p>
-  <div class="userbar"><span>${BOOKS.length>1?`<label>문제집 <select id="bookSel">${BOOKS.map(b=>`<option value="${esc(b.id)}" ${b.id===BOOK.id?"selected":""}>${esc(b.title)}</option>`).join("")}</select></label>`:`문제집: <b>${esc(BOOK.title)}</b>`}</span>
+  <div class="userbar"><span>${bookSelHtml()}</span>
     <span>${esc(USER.email)} · ${ROLE==="admin"?`<button class="btn" id="adminBtn" style="padding:4px 10px">이용자 관리</button> `:""}<button class="btn" id="logout" style="padding:4px 10px">로그아웃</button></span></div>
   ${homeExtras()}
   <div class="sheet"><h2>오답노트 · ${wrongIds.length}문항</h2>
@@ -535,10 +536,7 @@ function homeExtras(){
   return `<div class="sheet"><h2>랜덤 실전 모의고사</h2>
     <p class="note" style="padding-top:12px">이 문제집의 전체 ${Object.keys(QMAP).length.toLocaleString()}문항에서 실제 시험 구성 그대로 무작위로 뽑아 매번 새 시험지를 만들어요. 1교시는 신경언어 30·유창성 25·음성 25문항에 75분, 2교시는 언어발달 35·조음음운 35문항에 65분이에요. 과목마다 모든 문제가 한 번씩 나올 때까지 같은 문제는 다시 나오지 않고, 다 쓰면 다시 섞어서 계속 이어져요.</p>
     <div class="actions">${["p1","p2"].map(pid=>{const ok=RP[pid].every(([sid,n])=>poolIds([sid]).length>=n);const nm=pid==="p1"?"1교시":"2교시";return ok?`<button class="btn primary" data-rp="${pid}">${nm} 랜덤 시험<small>${pid==="p1"?"80문항 · 75분":"70문항 · 65분"} · ${rc[pid]+1}번째</small></button>`:`<button class="btn" disabled>${nm} 랜덤 시험<small>이 문제집은 아직 과목 문항이 부족해요</small></button>`}).join("")}</div></div>
-  <div class="sheet"><h2>제14회 기출 답안지 (2025. 12. 6. 시행)</h2>
-    <p class="note" style="padding-top:12px">문제지는 따로 펴 두고, 여기서는 실제 시험처럼 시간 안에 답안만 표기해요. 제출하면 국시원 최종답안으로 채점해요.</p>
-    ${k?`<div class="actions"><button class="btn primary" id="k14Resume">${k.pid==="p1"?"1교시":"2교시"} 이어서 표기하기<small>${Object.keys(k.ans).length}/${KEY14[k.pid].length}문항 표기함</small></button><button class="btn" id="k14Discard">버리고 새로 시작</button></div>`:
-    `<div class="actions"><button class="btn primary" data-k14="p1">1교시 시작<small>80문항 · 75분</small></button><button class="btn primary" data-k14="p2">2교시 시작<small>70문항 · 65분</small></button></div>`}</div>`;
+`;
 }
 function bindHomeExtras(){
   $("#home").querySelectorAll("[data-rsub]").forEach(b=>b.onclick=()=>{
@@ -627,26 +625,30 @@ function startRandPeriod(pid){
 }
 
 /* ================= 제14회 기출 답안지 ================= */
-const KEY14={
-  p1:[1,2,5,3,4,3,4,1,4,3, 2,5,2,1,5,1,5,3,3,4, 4,2,3,3,3,1,5,2,4,2, 3,3,5,3,2,4,5,2,4,1, 1,2,2,1,4,2,1,5,5,3, 1,4,5,4,2,2,5,4,5,2, 4,4,1,4,5,5,3,5,4,3, 3,1,1,2,5,3,2,3,2,1],
-  p2:[4,3,1,1,3,5,1,4,5,3, 3,3,2,4,1,3,4,2,2,4, 3,1,5,4,2,2,5,5,5,4, 1,2,3,1,5,2,1,4,5,3, 1,3,3,4,3,5,1,3,5,2, 2,4,4,4,4,3,4,3,5,2, 5,2,1,3,2,5,1,2,1,5]
+const PAST={
+  9:{year:"2020",date:"2020. 12. 5.",p1:[4,5,1,4,2,5,4,5,1,5,1,2,2,4,5,3,3,4,3,1,2,2,4,4,1,2,3,5,3,3,4,4,5,2,3,5,1,2,3,3,1,1,2,3,4,5,5,5,5,2,2,4,1,5,3,3,1,5,2,5,2,2,1,2,1,2,5,4,5,4,3,4,1,2,1,2,3,5,2,5],p2:[5,2,1,1,5,2,2,3,3,4,4,2,5,1,5,4,3,5,3,2,2,4,3,1,3,4,4,3,1,4,2,2,2,4,3,2,4,3,5,2,1,4,4,3,4,2,1,3,3,2,2,3,2,3,4,4,5,1,3,4,1,2,2,5,1,4,4,2,1,1]},
+  10:{year:"2021",date:"2021. 12. 4.",p1:[1,2,2,2,4,4,3,4,5,3,1,5,1,5,2,5,2,3,4,1,3,5,3,5,5,4,4,4,1,5,4,4,2,5,2,3,4,1,5,2,5,3,4,1,3,2,4,4,5,4,3,1,1,5,3,1,4,1,1,5,5,4,3,3,5,1,2,3,2,5,2,4,2,5,3,4,5,5,4,4],p2:[3,5,5,4,3,3,2,1,5,3,2,2,4,1,5,1,2,1,3,5,4,2,2,4,1,5,4,1,4,4,3,3,2,4,1,2,3,2,4,1,2,1,5,5,2,2,5,3,4,5,1,4,4,5,3,5,3,2,1,5,4,2,1,2,4,3,3,4,3,5]},
+  11:{year:"2022",date:"2022. 12. 3.",p1:[2,5,4,2,1,3,2,5,4,3,1,3,1,1,3,2,3,5,2,1,5,4,4,3,3,4,2,4,2,5,5,4,5,2,5,3,1,1,1,2,4,3,4,1,3,2,2,5,2,1,2,3,3,4,1,4,5,5,2,1,4,3,2,5,3,2,4,5,5,1,3,3,2,3,5,1,4,1,4,1],p2:[5,3,3,4,2,3,1,1,5,1,4,4,5,5,2,3,2,1,4,1,2,2,2,1,1,5,4,3,3,3,5,2,3,2,4,3,1,1,4,5,5,4,3,1,1,4,4,2,4,2,3,3,1,3,5,2,3,1,5,5,2,1,3,2,4,1,5,2,2,2]},
+  12:{year:"2023",date:"2023. 12. 2.",p1:[5,3,2,4,5,1,5,5,3,4,1,1,4,3,3,3,5,2,4,2,1,1,1,2,1,4,5,4,2,2,5,5,1,3,4,4,1,2,1,4,5,3,1,4,2,2,1,5,4,2,3,3,3,3,4,4,2,3,2,5,2,1,4,5,3,5,1,3,4,1,5,3,3,4,2,2,5,4,1,1],p2:[5,4,3,4,5,5,2,2,2,3,1,2,2,5,4,1,3,5,5,4,3,4,4,2,1,3,3,1,5,3,5,1,1,3,1,5,2,4,2,4,1,1,3,4,5,1,3,5,3,2,4,1,2,2,1,5,3,3,4,5,3,5,3,4,5,1,2,1,4,4]},
+  13:{year:"2024",date:"2024. 11. 30.",p1:[3,5,4,1,5,5,2,4,1,3,3,2,2,5,5,1,2,4,5,5,2,1,4,2,4,3,2,3,3,1,2,4,5,1,2,3,3,3,2,2,3,1,4,5,5,1,4,5,5,3,3,4,1,5,4,1,5,5,4,4,1,3,5,3,2,2,1,5,4,4,1,3,2,1,3,3,5,4,4,2],p2:[2,5,4,2,1,5,5,5,2,1,1,1,2,3,4,4,3,4,2,5,5,3,4,1,3,2,4,4,5,3,3,3,1,2,5,4,5,3,5,5,1,1,3,2,4,2,5,1,3,1,5,2,2,2,4,3,3,4,2,4,5,3,1,4,2,3,4,3,1,2]},
+  14:{year:"2025",date:"2025. 12. 6.",p1:[1,2,5,3,4,3,4,1,4,3,2,5,2,1,5,1,5,3,3,4,4,2,3,3,3,1,5,2,4,2,3,3,5,3,2,4,5,2,4,1,1,2,2,1,4,2,1,5,5,3,1,4,5,4,2,2,5,4,5,2,4,4,1,4,5,5,3,5,4,3,3,1,1,2,5,3,2,3,2,1],p2:[4,3,1,1,3,5,1,4,5,3,3,3,2,4,1,3,4,2,2,4,3,1,5,4,2,2,5,5,5,4,1,2,3,1,5,2,1,4,5,3,1,3,3,4,3,5,1,3,5,2,2,4,4,4,4,3,4,3,5,2,5,2,1,3,2,5,1,2,1,5]}
 };
 const K14SUB={p1:[["신경언어장애",1,30],["유창성장애",31,55],["음성장애",56,80]],p2:[["언어발달장애",1,35],["조음음운장애",36,70]]};
 const K14MIN={p1:75,p2:65};
 let k14=null, k14H=null;
-function startK14(pid){
-  const n=KEY14[pid].length;
-  confirmBox(`제14회 ${pid==="p1"?"1교시":"2교시"} 시작`,`${n}문항 · 제한시간 ${K14MIN[pid]}분. 문제지를 옆에 펴 두고 시작하세요. 시간이 끝나면 자동으로 제출돼요.`,"시작",()=>{
-    k14={pid,ans:{},endAt:Date.now()+K14MIN[pid]*60000}; LS.set(K_K14,k14); renderK14();
+function startK14(round,pid){
+  const n=PAST[round][pid].length;
+  confirmBox(`제${round}회 ${pid==="p1"?"1교시":"2교시"} 시작`,`${n}문항 · 제한시간 ${K14MIN[pid]}분. 문제지를 옆에 펴 두고 시작하세요. 시간이 끝나면 자동으로 제출돼요.`,"시작",()=>{
+    k14={round,pid,ans:{},endAt:Date.now()+K14MIN[pid]*60000}; LS.set(K_K14,k14); renderK14();
   });
 }
 function renderK14(){
   show("k14");
   const pid=k14.pid, name=pid==="p1"?"1교시":"2교시";
-  $("#k14").innerHTML=`<div class="topbar"><span class="ttl">제14회 기출 · ${name}</span><span class="meta">${KEY14[pid].length}문항</span><span class="sp"></span>
+  $("#k14").innerHTML=`<div class="topbar"><span class="ttl">제${k14.round}회 기출 · ${name}</span><span class="meta">${PAST[k14.round][pid].length}문항</span><span class="sp"></span>
     <span class="rstat" id="k14cnt"></span><span class="timer" id="k14timer">--:--</span></div>
     <div class="workspace"><main class="k14pane"><div class="k14inner">
-    <div class="k14guide">문제지(2025년도 제14회 ${name})를 보면서 번호를 눌러 답을 표기하세요. 같은 번호를 다시 누르면 표기가 지워져요. 문제지는 <a href="https://www.kuksiwon.or.kr" target="_blank" rel="noopener">국시원 홈페이지</a>에서도 확인할 수 있어요.</div>
+    <div class="k14guide">문제지(${PAST[k14.round].year}년도 제${k14.round}회 ${name})를 보면서 번호를 눌러 답을 표기하세요. 같은 번호를 다시 누르면 표기가 지워져요. 문제지는 <a href="https://www.kuksiwon.or.kr" target="_blank" rel="noopener">국시원 홈페이지</a>에서도 확인할 수 있어요.</div>
     ${K14SUB[pid].map(([sn,a,b])=>`<section class="k14sub"><h3>${sn} (${a}~${b}번)</h3><div class="k14grid">${
       Array.from({length:b-a+1},(_,i)=>a+i).map(n=>`<div class="orow"><span class="n" style="cursor:default">${n}</span>${[1,2,3,4,5].map(k=>`<button class="b" data-n="${n}" data-k="${k}" aria-label="${n}번 ${k}번 표기">${k}</button>`).join('')}</div>`).join('')}</div></section>`).join('')}
     <div class="k14foot"><button class="btn" id="k14home">나가기 (표기 저장됨)</button><button class="btn primary" id="k14submit">답안 제출</button></div>
@@ -654,13 +656,13 @@ function renderK14(){
   $("#k14").querySelector(".k14pane").onclick=e=>{const t=e.target.closest("button[data-n]");if(!t)return;
     const n=+t.dataset.n,k=+t.dataset.k; if(k14.ans[n]===k) delete k14.ans[n]; else k14.ans[n]=k; LS.set(K_K14,k14); k14Refresh()};
   $("#k14home").onclick=()=>{k14=null;renderHome()};
-  $("#k14submit").onclick=()=>{const un=KEY14[k14.pid].length-Object.keys(k14.ans).length;
+  $("#k14submit").onclick=()=>{const un=PAST[k14.round][k14.pid].length-Object.keys(k14.ans).length;
     confirmBox("답안을 제출할까요?",un?`아직 표기하지 않은 문제가 ${un}개 있어요. 제출하면 답을 바꿀 수 없어요.`:"제출하면 답을 바꿀 수 없어요.","제출",()=>finishK14(false))};
   k14Refresh(); k14Tick(); clearInterval(k14H); k14H=setInterval(k14Tick,1000);
 }
 function k14Refresh(){
   $("#k14").querySelectorAll("button[data-n]").forEach(b=>b.classList.toggle("on",k14.ans[+b.dataset.n]===+b.dataset.k));
-  $("#k14cnt").textContent=`표기 ${Object.keys(k14.ans).length}/${KEY14[k14.pid].length}`;
+  $("#k14cnt").textContent=`표기 ${Object.keys(k14.ans).length}/${PAST[k14.round][k14.pid].length}`;
 }
 function k14Tick(){
   const left=Math.max(0,k14.endAt-Date.now()), s=Math.ceil(left/1000);
@@ -672,19 +674,19 @@ function k14Tick(){
 function finishK14(auto){
   clearInterval(k14H);
   const r=k14; LS.del(K_K14);
-  const key=KEY14[r.pid], name=r.pid==="p1"?"1교시":"2교시";
+  const key=PAST[r.round][r.pid], name=r.pid==="p1"?"1교시":"2교시";
   const score=key.filter((a,i)=>r.ans[i+1]===a).length, total=key.length, pct=score/total*100;
   const subs=K14SUB[r.pid].map(([sn,a,b])=>{let c=0;for(let n=a;n<=b;n++)if(r.ans[n]===key[n-1])c++;return [sn,c,b-a+1]});
   const anyFail=subs.some(([,c,t])=>c/t<0.4), pass=pct>=60&&!anyFail;
   const hist=LS.get(K_HIST,[]); const d=new Date();
-  hist.push({date:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,label:`제14회 기출 ${name}`,score,total});
+  hist.push({date:`${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,label:`제${r.round}회 기출 ${name}`,score,total});
   LS.set(K_HIST,hist.slice(-40));
   show("result"); window.scrollTo(0,0);
   let f="all";
   const rows=()=>key.map((a,i)=>{const n=i+1,my=r.ans[n],st=!my?"u":(my===a?"o":"x");return {n,a,my,st}}).filter(x=>f==="all"||x.st===f);
   const draw=()=>{$("#k14list").innerHTML=`<table class="ktable"><tr><th>번호</th><th>과목</th><th>내 답</th><th>정답</th><th>결과</th></tr>${rows().map(x=>`<tr class="${x.st}"><td>${x.n}</td><td>${K14SUB[r.pid].find(([,a,b])=>x.n>=a&&x.n<=b)[0]}</td><td>${x.my?CIRC[x.my-1]:'-'}</td><td>${CIRC[x.a-1]}</td><td>${{o:'<span class="good">정답</span>',x:'<span class="bad">오답</span>',u:'안 풂'}[x.st]}</td></tr>`).join('')||'<tr><td colspan="5">해당하는 문제가 없어요.</td></tr>'}</table>`};
   $("#result").innerHTML=`<div class="verdict"><div class="big">${score}<small> / ${total}</small></div>
-    <div><div class="v ${pass?'pass':'fail'}">제14회 ${name} · ${pass?'합격선 통과':'합격선 미달'} · ${Math.round(pct)}%</div>
+    <div><div class="v ${pass?'pass':'fail'}">제${r.round}회 ${name} · ${pass?'합격선 통과':'합격선 미달'} · ${Math.round(pct)}%</div>
     <div class="d">${auto?'제한시간이 끝나 자동 제출되었어요. ':''}합격 기준: 총점 60% 이상, 각 과목 40% 이상 (이 교시만 기준으로 판정). 채점 기준: 국시원 최종답안</div></div></div>
     <table class="stable"><tr><th>과목</th><th style="text-align:right">맞힌 수</th><th style="text-align:right">정답률</th><th>과락</th></tr>
     ${subs.map(([n,c,t])=>{const p=c/t;return `<tr><td>${n}</td><td class="r">${c}/${t}</td><td class="r">${Math.round(p*100)}%</td><td>${p<0.4?'<span class="bad">과락 (40% 미만)</span>':'<span class="good">통과</span>'}</td></tr>`}).join('')}</table>
@@ -781,6 +783,33 @@ function alertBox(title,body){
   $("#modal").classList.remove("hidden"); $("#myes").onclick=closeModal; $("#myes").focus();
 }
 
+/* ================= 국가시험 기출 답안지 (드롭다운 항목) ================= */
+function bookSelHtml(){
+  return `<label>문제집 <select id="bookSel">${BOOKS.map(b=>`<option value="${esc(b.id)}" ${b.id===BOOK.id?"selected":""}>${esc(b.title)}</option>`).join("")}<option value="_past" ${BOOK.id==="_past"?"selected":""}>국가시험 기출 답안지 (제9~14회)</option></select></label>`;
+}
+function renderPastHome(){
+  const k=LS.get(K_K14,null), hist=LS.get(K_HIST,[]);
+  const rounds=Object.keys(PAST).map(Number).sort((a,b)=>b-a);
+  $("#home").innerHTML=`<h1>2급 언어재활사 CBT 연습</h1>
+  <p class="lead">국가시험 기출 문제지를 옆에 펴 두고, 실제 시험처럼 시간 안에 답안만 표기해요. 제출하면 국시원 최종답안으로 채점해요.</p>
+  <div class="userbar"><span>${bookSelHtml()}</span>
+    <span>${esc(USER.email)} · ${ROLE==="admin"?`<button class="btn" id="adminBtn" style="padding:4px 10px">이용자 관리</button> `:""}<button class="btn" id="logout" style="padding:4px 10px">로그아웃</button></span></div>
+  ${k?`<div class="sheet"><h2>표기하던 답안지가 있어요</h2><div class="actions"><button class="btn primary" id="k14Resume">제${k.round}회 ${k.pid==="p1"?"1교시":"2교시"} 이어서 표기하기<small>${Object.keys(k.ans).length}/${PAST[k.round][k.pid].length}문항 표기함</small></button><button class="btn" id="k14Discard">버리고 새로 시작</button></div></div>`:""}
+  <div class="sheet"><h2>회차 선택</h2>
+    <table class="stable"><tr><th>회차</th><th>시행일</th><th></th></tr>
+    ${rounds.map(r=>`<tr><td><b>제${r}회</b> (${PAST[r].year})</td><td>${PAST[r].date}</td><td style="text-align:right;white-space:nowrap"><button class="btn primary" data-pr="${r}" data-pp="p1" style="padding:6px 12px">1교시</button> <button class="btn primary" data-pr="${r}" data-pp="p2" style="padding:6px 12px">2교시</button></td></tr>`).join("")}</table></div>
+  ${hist.length?`<div class="sheet"><h2>최근 기록</h2><table class="stable"><tr><th>날짜</th><th>시험</th><th style="text-align:right">점수</th></tr>${hist.slice(-10).reverse().map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.label)}</td><td class="r">${x.score}/${x.total}</td></tr>`).join("")}</table></div>`:""}`;
+  $("#logout").onclick=()=>confirmBox("로그아웃할까요?","기록은 계정에 저장되어 있어서 다시 로그인하면 이어서 볼 수 있어요.","로그아웃",async()=>{await flushSync();await sb.auth.signOut();location.reload()});
+  $("#bookSel").onchange=async()=>{await flushSync();await openBook($("#bookSel").value)};
+  if($("#adminBtn")) $("#adminBtn").onclick=renderAdmin;
+  $("#home").querySelectorAll("[data-pr]").forEach(b=>b.onclick=()=>{
+    const go=()=>startK14(+b.dataset.pr,b.dataset.pp);
+    if(LS.get(K_K14,null)) confirmBox("표기하던 답안지가 있어요","새로 시작하면 표기하던 답안은 사라져요.","새로 시작",()=>{LS.del(K_K14);setTimeout(go,0)}); else go();
+  });
+  const kr=$("#k14Resume"); if(kr){kr.onclick=()=>{k14=LS.get(K_K14,null);renderK14()};
+    $("#k14Discard").onclick=()=>confirmBox("표기한 답안을 버릴까요?","지금까지 표기한 답이 모두 지워져요.","버리기",()=>{LS.del(K_K14);renderHome()})}
+}
+
 /* ================= 로그인 · 데이터 불러오기 ================= */
 const SUBDEF={p1:{name:"1교시",min:75,subs:[["neuro","신경언어장애",30],["flu","유창성장애",25],["voice","음성장애",25]]},
               p2:{name:"2교시",min:65,subs:[["lang","언어발달장애",35],["artic","조음음운장애",35]]}};
@@ -820,13 +849,14 @@ async function boot(){
     const {data:prog,error:e3}=await sb.from("cbt_progress").select("key,value");
     if(e3) throw e3;
     (prog||[]).forEach(r=>{CACHE[r.key]=r.value});
-    const last=CACHE["_last_book"]; await openBook(BOOKS.some(b=>b.id===last)?last:BOOKS[0].id);
+    const last=CACHE["_last_book"]; await openBook(last==="_past"||BOOKS.some(b=>b.id===last)?last:BOOKS[0].id);
   }catch(err){ console.error(err); show("auth"); $("#auth").innerHTML=`<div class="authbox"><h1>불러오지 못했어요</h1><p>인터넷 연결을 확인하고 다시 시도해 주세요.</p><button class="btn primary" onclick="location.reload()">다시 시도</button></div>`; }
 }
 async function openBook(id){
   loading("문제를 불러오는 중…");
-  BOOK=BOOKS.find(b=>b.id===id); CACHE["_last_book"]=id;
+  BOOK=id==="_past"?{id:"_past",title:"국가시험 기출 답안지"}:BOOKS.find(b=>b.id===id); CACHE["_last_book"]=id;
   pending["_last_book"]={v:id}; queueSync();
+  if(id==="_past"){ SETS=[]; indexQs(); DATA=null; run=null; rs=null; k14=null; renderHome(); return; }
   const rows=[]; for(let from=0;;from+=1000){
     const {data,error}=await sb.from("cbt_questions").select("set_code,period,subject,n,data").eq("book_id",id).order("set_code").order("period").order("n").range(from,from+999);
     if(error) throw error; rows.push(...data); if(data.length<1000) break; }
