@@ -840,7 +840,7 @@ function buildStudy(rows){
     q.id=`S-${r.subject}-${r.n}`; QMAP[q.id]=q; (STUDY[r.subject]=STUDY[r.subject]||[]).push(q);
   });
 }
-function studyLabel(q){return `${q.subj} ${q.topic}${q.kind==="예제"?" · 예제":" · 대표문항"}`}
+function studyLabel(q){return q.kind==="연습"?`${q.subj} 연습문제 ${q.topic}`:q.kind==="추가"?`${q.subj} 추가문제 ${q.topic-100}`:`${q.subj} ${q.topic}${q.kind==="예제"?" · 예제":" · 대표문항"}`}
 function studyRich(t){ // 주요개념: 빈 줄로 문단 구분, '|'로 시작하는 줄은 표(첫 줄은 머리글), 칸 안 <br>은 줄바꿈
   return String(t).split(/\n\s*\n/).map(b=>{
     const lines=b.split("\n");
@@ -875,7 +875,7 @@ function renderStudyHome(){
       ${s.n?`<div style="font-size:13px;color:var(--sub);margin-top:4px">푼 문제 ${s.solved}/${s.n}${s.solved?` · 맞힘 ${s.ok} (${Math.round(s.ok/s.solved*100)}%)`:""}${w?` · 오답 ${w}`:""}</div>`:""}</td>
       <td class="num" style="white-space:normal;text-align:right">${s.n?`<button class="btn primary" data-sseq="${sid}" style="margin:2px">순서대로</button><button class="btn" data-srand="${sid}" style="margin:2px">섞어서</button>${w?`<button class="btn" data-swrong="${sid}" style="margin:2px">오답만</button>`:""}`:""}</td></tr>`;
   });
-  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책 순서(대표문항 → 예제)로 풀어요. 풀면서 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
+  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책에 실린 순서대로 풀어요. 풀면서 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
     <div class="actions"><button class="btn" id="stReset">푼 기록 지우기</button></div></div>`;
   $("#home").innerHTML=h;
   $("#logout").onclick=()=>confirmBox("로그아웃할까요?","기록은 계정에 저장되어 있어서 다시 로그인하면 이어서 볼 수 있어요.","로그아웃",async()=>{await flushSync();await sb.auth.signOut();location.reload()});
