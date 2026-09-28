@@ -178,6 +178,11 @@ button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--accent);ou
 .tbtn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:3px;padding:3px 10px}
 .rpane{flex:1;overflow-y:auto;background:var(--paper);padding:26px 28px 60px}
 .rverdict{font-weight:700;margin:14px 0 0;font-size:17px}
+.smode{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:12px 16px 0}.smode-l{font-size:14px;color:var(--sub);margin-right:4px}
+.rscore{font-size:20px;margin:6px 0}.rscore b{font-size:28px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px;margin:6px 0 14px}
+.rg{min-height:44px;border-radius:8px;border:1px solid var(--line);background:#fff;font-weight:700;cursor:pointer;font-size:15px}
+.rg.o{background:var(--ok-soft);border-color:var(--ok);color:var(--ok)}.rg.x{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}.rg.na{background:#f1f3f5;color:var(--sub)}
 .rverdict.o{color:var(--ok)} .rverdict.x{color:var(--bad)}
 .rnext{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
 @media (max-width:860px){.rpane{padding:18px 16px 60px}}
@@ -568,7 +573,7 @@ function bindHomeExtras(){
     $("#k14Discard").onclick=()=>confirmBox("표기한 답안을 버릴까요?","지금까지 표기한 답이 모두 지워져요.","버리기",()=>{LS.del(K_K14);renderHome()})}
 }
 function renderRand(){
-  show("rand");
+  st=null; show("rand");
   document.documentElement.style.setProperty("--fs",[15,17,20][fs]+"px");
   $("#rand").innerHTML=`<div class="topbar"><span class="ttl">전체 랜덤 연습</span><span class="meta">${esc(subsLabel(rs.subs))}</span><span class="sp"></span>
     <span class="rstat" id="rstat"></span>
@@ -724,6 +729,15 @@ document.addEventListener("keydown",e=>{
   if(e.key==="Escape"&&!$("#modal").classList.contains("hidden"))closeModal();
   if(!$("#rand").classList.contains("hidden")&&$("#modal").classList.contains("hidden")){
     if(e.target.closest&&e.target.closest("input,textarea"))return;
+    if(st){ // 풀이집 화면
+      if(e.target.closest&&e.target.closest(".opt,button,summary"))return;
+      const exam=st.mode==="exam", locked=exam?!!st.graded:st.pick!=null;
+      if(/^[1-5]$/.test(e.key)&&!locked&&$("#rpane .opt[data-k]"))studyPick(+e.key);
+      else if((e.key==="Enter"||e.key==="ArrowRight")&&$("#snext")&&(exam||locked)){e.preventDefault();$("#snext").click()}
+      else if(e.key==="ArrowLeft"&&$("#sprev")){e.preventDefault();$("#sprev").click()}
+      return;
+    }
+    if(!rs)return;
     if(/^[1-5]$/.test(e.key)&&!rs.done)randPick(+e.key);
     else if((e.key==="Enter"||e.key==="ArrowRight")&&rs.done){e.preventDefault();randNext()}
     return;
@@ -861,28 +875,35 @@ function renderStudyHome(){
   const S=LS.get(K_STUDY,{}), wrong=LS.get(K_WRONG,{});
   const total=Object.keys(QMAP).length;
   let h=`<h1>2급 언어재활사 CBT 연습</h1>
-  <p class="lead">과목별로 한 문제씩 풀고, 고르면 바로 정답과 해설을 보여 줘요. 대표문항에는 주요개념도 접어 두었어요.</p>
+  <p class="lead">과목별로 풀고 정답과 해설을 확인해요. 채점 방식은 아래에서 고를 수 있어요.</p>
   <div class="userbar"><span>${bookSelHtml()}</span>
     <span>${esc(USER.email)} · ${ROLE==="admin"?`<button class="btn" id="adminBtn" style="padding:4px 10px">이용자 관리</button> `:""}<button class="btn" id="logout" style="padding:4px 10px">로그아웃</button></span></div>`;
   if(S.cur&&S.cur.ids&&S.cur.ids.length){
-    h+=`<div class="sheet"><h2>풀던 문제가 있어요</h2><p class="note" style="padding-top:12px">${esc(S.cur.label)} · ${S.cur.pos+1}/${S.cur.ids.length}번째</p>
+    h+=`<div class="sheet"><h2>풀던 문제가 있어요</h2><p class="note" style="padding-top:12px">${esc(S.cur.label)} · ${S.cur.pos+1}/${S.cur.ids.length}번째${S.cur.mode==="exam"?(S.cur.graded?" · 채점 완료":" · 채점 전"):""}</p>
       <div class="actions"><button class="btn primary" id="stResume">이어서 풀기</button></div></div>`;
   }
-  h+=`<div class="sheet"><h2>${esc(BOOK.title)} · ${total}문항</h2><table class="ptable">`;
+  const mode=S.mode||"exam";
+  h+=`<div class="sheet"><h2>${esc(BOOK.title)} · ${total}문항</h2>
+    <div class="smode" role="group" aria-label="채점 방식"><span class="smode-l">채점 방식</span>
+      <button class="btn${mode==="exam"?" primary":""}" data-smode="exam" aria-pressed="${mode==="exam"}">다 풀고 한 번에 채점</button>
+      <button class="btn${mode==="now"?" primary":""}" data-smode="now" aria-pressed="${mode==="now"}">한 문제씩 바로 확인</button></div>
+    <table class="ptable">`;
   SUBJS.forEach(([sid,name])=>{
     const s=studyStats(sid), w=(STUDY[sid]||[]).filter(q=>wrong[q.id]).length;
     h+=`<tr><td class="pname">${name}${s.n?`<span class="tag ready">${s.n}문항</span>`:`<span class="tag wait">준비 중</span>`}
       ${s.n?`<div style="font-size:13px;color:var(--sub);margin-top:4px">푼 문제 ${s.solved}/${s.n}${s.solved?` · 맞힘 ${s.ok} (${Math.round(s.ok/s.solved*100)}%)`:""}${w?` · 오답 ${w}`:""}</div>`:""}</td>
       <td class="num" style="white-space:normal;text-align:right">${s.n?`<button class="btn primary" data-sseq="${sid}" style="margin:2px">순서대로</button><button class="btn" data-srand="${sid}" style="margin:2px">섞어서</button>${w?`<button class="btn" data-swrong="${sid}" style="margin:2px">오답만</button>`:""}`:""}</td></tr>`;
   });
-  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책에 실린 순서대로 풀어요. 풀면서 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
+  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책에 실린 순서대로 풀어요. '다 풀고 한 번에 채점'은 시험처럼 끝까지 푼 뒤 제출하면 점수와 해설이 나와요. 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
     <div class="actions"><button class="btn" id="stReset">푼 기록 지우기</button></div></div>`;
   $("#home").innerHTML=h;
   $("#logout").onclick=()=>confirmBox("로그아웃할까요?","기록은 계정에 저장되어 있어서 다시 로그인하면 이어서 볼 수 있어요.","로그아웃",async()=>{await flushSync();await sb.auth.signOut();location.reload()});
   $("#bookSel").onchange=async()=>{await flushSync();await openBook($("#bookSel").value)};
   if($("#adminBtn")) $("#adminBtn").onclick=renderAdmin;
   if($("#stResume")) $("#stResume").onclick=()=>{st=LS.get(K_STUDY,{}).cur;renderStudy()};
-  const start=(label,ids)=>{const S2=LS.get(K_STUDY,{});S2.cur={label,ids,pos:0,pick:null};LS.set(K_STUDY,S2);st=S2.cur;renderStudy()};
+  $("#home").querySelectorAll("[data-smode]").forEach(b=>b.onclick=()=>{const S2=LS.get(K_STUDY,{});S2.mode=b.dataset.smode;LS.set(K_STUDY,S2);renderHome()});
+  const start=(label,ids)=>{const S2=LS.get(K_STUDY,{});const m=S2.mode||"exam";
+    S2.cur={label,ids,pos:0,pick:null,mode:m,picks:{},graded:false};LS.set(K_STUDY,S2);st=S2.cur;renderStudy()};
   const name=sid=>SUBJS.find(x=>x[0]===sid)[1];
   $("#home").querySelectorAll("[data-sseq]").forEach(b=>b.onclick=()=>{const sid=b.dataset.sseq;start(`${name(sid)} · 순서대로`,STUDY[sid].map(q=>q.id))});
   $("#home").querySelectorAll("[data-srand]").forEach(b=>b.onclick=()=>{const sid=b.dataset.srand;start(`${name(sid)} · 섞어서`,shuffle(STUDY[sid].map(q=>q.id)))});
@@ -895,34 +916,39 @@ function renderStudy(){
   $("#rand").innerHTML=`<div class="topbar"><span class="ttl">${esc(BOOK.title)}</span><span class="meta">${esc(st.label)}</span><span class="sp"></span>
     <span class="rstat" id="rstat"></span>
     <div class="fsbtns">${["작게","보통","크게"].map((t,i)=>`<button data-fs="${i}" aria-pressed="${i===fs}">${t}</button>`).join('')}</div>
+    <button class="tbtn" id="rsubmit" hidden>제출하고 채점</button>
     <button class="tbtn" id="rhome">목록으로</button></div>
     <div class="workspace"><main class="rpane" id="rpane" tabindex="-1"></main></div>`;
   $("#rand").querySelectorAll("[data-fs]").forEach(b=>b.onclick=()=>{fs=+b.dataset.fs;LS.set(K_FS,fs);
     document.documentElement.style.setProperty("--fs",[15,17,20][fs]+"px");
     $("#rand").querySelectorAll("[data-fs]").forEach(x=>x.setAttribute("aria-pressed",+x.dataset.fs===fs))});
   $("#rhome").onclick=()=>{st=null;renderHome()};
-  drawStudy();
+  $("#rsubmit").onclick=studySubmit;
+  if(st.mode==="exam"&&st.graded&&st.showResult) drawStudyResult(); else drawStudy();
 }
 function drawStudy(){
   const q=QMAP[st.ids[st.pos]]; if(!q){st.pos=Math.min(st.pos+1,st.ids.length-1);return}
   const A=(LS.get(K_STUDY,{}).ans)||{};
-  const my=st.pick, done=my!=null;
-  $("#rstat").textContent=`${st.pos+1}/${st.ids.length}`;
+  const exam=st.mode==="exam", picks=st.picks||{};
+  const my=exam?(picks[q.id]||null):st.pick, done=exam?!!st.graded:my!=null;
+  const nAns=exam?st.ids.filter(id=>picks[id]).length:0;
+  $("#rstat").textContent=exam&&!st.graded?`${st.pos+1}/${st.ids.length} · 푼 문제 ${nAns}`:`${st.pos+1}/${st.ids.length}`;
+  $("#rsubmit").hidden=!(exam&&!st.graded);
   $("#rpane").innerHTML=`<div class="qinner">
-    <div class="qhead"><span>${esc(studyLabel(q))}</span>${A[q.id]&&!done?`<span>· 전에 ${A[q.id]===q.a?"맞힘":"틀림"}</span>`:""}</div>
+    <div class="qhead"><span>${esc(studyLabel(q))}</span>${A[q.id]&&!done&&!exam?`<span>· 전에 ${A[q.id]===q.a?"맞힘":"틀림"}</span>`:""}</div>
     <p class="qtext">${esc(q.q)}</p>
     ${q.box?`<div class="box">${q.box.map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:''}${q.img?`<img class="qimg" src="${q.img}" alt="문제 그림(책 원본)">`:''}
     <ol class="opts" ${done?'':'role="radiogroup"'}>${q.o.map((t,k)=>{const n=k+1;
-      if(!done) return `<li class="opt" role="radio" tabindex="0" aria-checked="false" data-k="${n}"><span class="c">${n}</span><span>${optBody(q,k,t)}</span></li>`;
+      if(!done) return `<li class="opt${my===n?" sel":""}" role="radio" tabindex="0" aria-checked="${my===n}" data-k="${n}"><span class="c">${n}</span><span>${optBody(q,k,t)}</span></li>`;
       const cls=n===q.a?'correct':(n===my?'wrong':''); const lab=n===q.a&&n===my?'정답 · 내 답':n===q.a?'정답':n===my?'내 답':'';
       return `<li class="opt ${cls}"><span class="c">${n}</span><span>${optBody(q,k,t)}</span>${lab?`<span class="lab">${lab}</span>`:''}</li>`}).join('')}</ol>
-    ${done?`<p class="rverdict ${my===q.a?'o':'x'}" aria-live="polite">${my===q.a?'정답이에요':`오답이에요 · 정답은 ${CIRC[q.a-1]}`}</p>
+    ${done?`<p class="rverdict ${my===q.a?'o':'x'}" aria-live="polite">${my===q.a?'정답이에요':my?`오답이에요 · 정답은 ${CIRC[q.a-1]}`:`풀지 않은 문제예요 · 정답은 ${CIRC[q.a-1]}`}</p>
       ${q.note?`<p class="qnote" style="margin:8px 0 0">${esc(q.note)}</p>`:""}
       ${q.key?`<div class="expl"><b>핵심용어</b>${esc(q.key)}</div>`:""}
       <div class="expl"><b>${q.kind==="예제"?"예제풀이":"문제풀이"}</b><div class="ebody">${studyRich(q.e||"")}</div></div>
       ${q.c?`<details class="concept"><summary>${q.kind==="예제"?"추가 학습 개념 보기":"주요개념 보기"}</summary><div class="cbody">${studyRich(q.c)}${q.src?`<p class="csrc">참고도서 · ${esc(q.src)}</p>`:""}</div></details>`:""}
       ${q.rel?`<p class="qnote" style="margin:10px 0 0">관련문항 · ${esc(q.rel)}</p>`:""}`:''}
-    <div class="rnext">${st.pos>0?`<button class="btn" id="sprev">← 이전</button>`:""}${done?(st.pos<st.ids.length-1?`<button class="btn primary" id="snext">다음 문제 →</button>`:`<button class="btn primary" id="sdone">다 풀었어요 · 목록으로</button>`):(st.pos<st.ids.length-1?`<button class="btn" id="sskip">건너뛰기</button>`:"")}</div>
+    <div class="rnext">${st.pos>0?`<button class="btn" id="sprev">← 이전</button>`:""}${exam?(st.graded?`<button class="btn" id="sres">채점 결과</button>${st.pos<st.ids.length-1?`<button class="btn primary" id="snext">다음 해설 →</button>`:""}`:(st.pos<st.ids.length-1?`<button class="btn primary" id="snext">다음 문제 →</button>`:`<button class="btn primary" id="ssub2">제출하고 채점하기</button>`)):(done?(st.pos<st.ids.length-1?`<button class="btn primary" id="snext">다음 문제 →</button>`:`<button class="btn primary" id="sdone">다 풀었어요 · 목록으로</button>`):(st.pos<st.ids.length-1?`<button class="btn" id="sskip">건너뛰기</button>`:""))}</div>
   </div>`;
   const pane=$("#rpane"); pane.classList.toggle("rv",done); pane.style.border="0"; pane.style.borderRadius="0"; pane.style.margin="0";
   if(!done){
@@ -931,13 +957,43 @@ function drawStudy(){
   }
   const mv=d=>{st.pos+=d;st.pick=null;saveSt();$("#rpane").scrollTop=0;drawStudy()};
   if($("#sprev")) $("#sprev").onclick=()=>mv(-1);
-  if($("#snext")) {$("#snext").onclick=()=>mv(1); $("#snext").focus({preventScroll:true});}
+  if($("#snext")) {$("#snext").onclick=()=>mv(1); if(done) $("#snext").focus({preventScroll:true});}
   if($("#sskip")) $("#sskip").onclick=()=>mv(1);
   if($("#sdone")) $("#sdone").onclick=()=>{const S=LS.get(K_STUDY,{});delete S.cur;LS.set(K_STUDY,S);st=null;renderHome()};
+  if($("#ssub2")) $("#ssub2").onclick=studySubmit;
+  if($("#sres")) $("#sres").onclick=()=>{st.showResult=true;saveSt();drawStudyResult()};
+}
+function studySubmit(){
+  const picks=st.picks||{}, left=st.ids.filter(id=>!picks[id]).length;
+  const go=()=>{
+    const S=LS.get(K_STUDY,{}); S.ans=S.ans||{}; const wrong=LS.get(K_WRONG,{});
+    st.ids.forEach(id=>{const q=QMAP[id]; if(!q) return; const k=picks[id];
+      if(k){S.ans[id]=k; if(k===q.a) delete wrong[id]; else wrong[id]={my:k};} else wrong[id]={my:0};});
+    st.graded=true; st.showResult=true; S.cur=st; LS.set(K_STUDY,S); LS.set(K_WRONG,wrong); drawStudyResult();
+  };
+  if(left) confirmBox(`안 푼 문제가 ${left}개 있어요`,"제출하면 안 푼 문제는 틀린 것으로 채점되고 '오답만' 목록에 들어가요.","제출하기",go);
+  else confirmBox("제출하고 채점할까요?","제출하면 답을 바꿀 수 없고, 점수와 해설이 나와요.","제출하기",go);
+}
+function drawStudyResult(){
+  const picks=st.picks||{}; let ok=0;
+  st.ids.forEach(id=>{const q=QMAP[id]; if(q&&picks[id]===q.a) ok++});
+  const N=st.ids.length, pct=N?Math.round(ok/N*100):0;
+  $("#rstat").textContent=`${ok}/${N}`; $("#rsubmit").hidden=true;
+  const pane=$("#rpane"); pane.classList.remove("rv");
+  pane.innerHTML=`<div class="qinner"><h2 style="margin:0 0 6px">채점 결과</h2>
+    <p class="rscore"><b>${ok}</b> / ${N}문항 맞힘 · ${pct}점</p>
+    <p class="qnote" style="margin:4px 0 12px">번호를 누르면 그 문제의 정답과 해설로 가요. 초록은 맞힌 문제, 빨강은 틀린 문제, 회색은 안 푼 문제예요.</p>
+    <div class="rgrid">${st.ids.map((id,i)=>{const q=QMAP[id]; const k=picks[id]; const c=!k?"na":(q&&k===q.a?"o":"x");
+      return `<button class="rg ${c}" data-go="${i}" aria-label="${i+1}번 ${c==="o"?"맞힘":c==="x"?"틀림":"안 품"}">${i+1}</button>`}).join("")}</div>
+    <div class="rnext"><button class="btn" id="rgHome">목록으로</button><button class="btn primary" id="rgFirst">해설 처음부터 보기</button></div></div>`;
+  pane.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{st.pos=+b.dataset.go;st.showResult=false;saveSt();pane.scrollTop=0;drawStudy()});
+  $("#rgFirst").onclick=()=>{st.pos=0;st.showResult=false;saveSt();pane.scrollTop=0;drawStudy()};
+  $("#rgHome").onclick=()=>{const S=LS.get(K_STUDY,{});delete S.cur;LS.set(K_STUDY,S);st=null;renderHome()};
 }
 function saveSt(){const S=LS.get(K_STUDY,{});S.cur=st;LS.set(K_STUDY,S)}
 function studyPick(k){
   const q=QMAP[st.ids[st.pos]];
+  if(st.mode==="exam"){ if(st.graded) return; st.picks=st.picks||{}; st.picks[q.id]=k; saveSt(); drawStudy(); return; }
   st.pick=k; const S=LS.get(K_STUDY,{}); S.ans=S.ans||{}; S.ans[q.id]=k; S.cur=st; LS.set(K_STUDY,S);
   const wrong=LS.get(K_WRONG,{}); if(k===q.a) delete wrong[q.id]; else wrong[q.id]={my:k}; LS.set(K_WRONG,wrong);
   drawStudy();
