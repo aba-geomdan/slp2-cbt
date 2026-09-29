@@ -875,35 +875,30 @@ function renderStudyHome(){
   const S=LS.get(K_STUDY,{}), wrong=LS.get(K_WRONG,{});
   const total=Object.keys(QMAP).length;
   let h=`<h1>2급 언어재활사 CBT 연습</h1>
-  <p class="lead">과목별로 풀고 정답과 해설을 확인해요. 채점 방식은 아래에서 고를 수 있어요.</p>
+  <p class="lead">과목별로 끝까지 풀고 제출하면 한 번에 채점하고, 정답과 해설을 보여 줘요.</p>
   <div class="userbar"><span>${bookSelHtml()}</span>
     <span>${esc(USER.email)} · ${ROLE==="admin"?`<button class="btn" id="adminBtn" style="padding:4px 10px">이용자 관리</button> `:""}<button class="btn" id="logout" style="padding:4px 10px">로그아웃</button></span></div>`;
   if(S.cur&&S.cur.ids&&S.cur.ids.length){
-    h+=`<div class="sheet"><h2>풀던 문제가 있어요</h2><p class="note" style="padding-top:12px">${esc(S.cur.label)} · ${S.cur.pos+1}/${S.cur.ids.length}번째${S.cur.mode==="exam"?(S.cur.graded?" · 채점 완료":" · 채점 전"):""}</p>
+    h+=`<div class="sheet"><h2>풀던 문제가 있어요</h2><p class="note" style="padding-top:12px">${esc(S.cur.label)} · ${S.cur.pos+1}/${S.cur.ids.length}번째${S.cur.graded?" · 채점 완료":" · 채점 전"}</p>
       <div class="actions"><button class="btn primary" id="stResume">이어서 풀기</button></div></div>`;
   }
-  const mode=S.mode||"exam";
-  h+=`<div class="sheet"><h2>${esc(BOOK.title)} · ${total}문항</h2>
-    <div class="smode" role="group" aria-label="채점 방식"><span class="smode-l">채점 방식</span>
-      <button class="btn${mode==="exam"?" primary":""}" data-smode="exam" aria-pressed="${mode==="exam"}">다 풀고 한 번에 채점</button>
-      <button class="btn${mode==="now"?" primary":""}" data-smode="now" aria-pressed="${mode==="now"}">한 문제씩 바로 확인</button></div>
-    <table class="ptable">`;
+  h+=`<div class="sheet"><h2>${esc(BOOK.title)} · ${total}문항</h2><table class="ptable">`;
   SUBJS.forEach(([sid,name])=>{
     const s=studyStats(sid), w=(STUDY[sid]||[]).filter(q=>wrong[q.id]).length;
     h+=`<tr><td class="pname">${name}${s.n?`<span class="tag ready">${s.n}문항</span>`:`<span class="tag wait">준비 중</span>`}
       ${s.n?`<div style="font-size:13px;color:var(--sub);margin-top:4px">푼 문제 ${s.solved}/${s.n}${s.solved?` · 맞힘 ${s.ok} (${Math.round(s.ok/s.solved*100)}%)`:""}${w?` · 오답 ${w}`:""}</div>`:""}</td>
       <td class="num" style="white-space:normal;text-align:right">${s.n?`<button class="btn primary" data-sseq="${sid}" style="margin:2px">순서대로</button><button class="btn" data-srand="${sid}" style="margin:2px">섞어서</button>${w?`<button class="btn" data-swrong="${sid}" style="margin:2px">오답만</button>`:""}`:""}</td></tr>`;
   });
-  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책에 실린 순서대로 풀어요. '다 풀고 한 번에 채점'은 시험처럼 끝까지 푼 뒤 제출하면 점수와 해설이 나와요. 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
+  h+=`</table><p class="note" style="padding-top:12px">'순서대로'는 책에 실린 순서대로 풀어요. 끝까지 푼 뒤 제출하면 점수와 해설이 나와요. 틀린 문제는 '오답만'에 모이고, 다시 맞히면 빠져요.</p>
     <div class="actions"><button class="btn" id="stReset">푼 기록 지우기</button></div></div>`;
   $("#home").innerHTML=h;
   $("#logout").onclick=()=>confirmBox("로그아웃할까요?","기록은 계정에 저장되어 있어서 다시 로그인하면 이어서 볼 수 있어요.","로그아웃",async()=>{await flushSync();await sb.auth.signOut();location.reload()});
   $("#bookSel").onchange=async()=>{await flushSync();await openBook($("#bookSel").value)};
   if($("#adminBtn")) $("#adminBtn").onclick=renderAdmin;
-  if($("#stResume")) $("#stResume").onclick=()=>{st=LS.get(K_STUDY,{}).cur;renderStudy()};
-  $("#home").querySelectorAll("[data-smode]").forEach(b=>b.onclick=()=>{const S2=LS.get(K_STUDY,{});S2.mode=b.dataset.smode;LS.set(K_STUDY,S2);renderHome()});
-  const start=(label,ids)=>{const S2=LS.get(K_STUDY,{});const m=S2.mode||"exam";
-    S2.cur={label,ids,pos:0,pick:null,mode:m,picks:{},graded:false};LS.set(K_STUDY,S2);st=S2.cur;renderStudy()};
+  if($("#stResume")) $("#stResume").onclick=()=>{st=LS.get(K_STUDY,{}).cur;
+    if(st.mode!=="exam"){st.mode="exam";st.picks={};st.graded=false;st.pick=null;saveSt()} renderStudy()};
+  const start=(label,ids)=>{const S2=LS.get(K_STUDY,{});
+    S2.cur={label,ids,pos:0,pick:null,mode:"exam",picks:{},graded:false};LS.set(K_STUDY,S2);st=S2.cur;renderStudy()};
   const name=sid=>SUBJS.find(x=>x[0]===sid)[1];
   $("#home").querySelectorAll("[data-sseq]").forEach(b=>b.onclick=()=>{const sid=b.dataset.sseq;start(`${name(sid)} · 순서대로`,STUDY[sid].map(q=>q.id))});
   $("#home").querySelectorAll("[data-srand]").forEach(b=>b.onclick=()=>{const sid=b.dataset.srand;start(`${name(sid)} · 섞어서`,shuffle(STUDY[sid].map(q=>q.id)))});
